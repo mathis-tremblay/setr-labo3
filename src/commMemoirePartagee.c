@@ -11,19 +11,6 @@
 
 #include "commMemoirePartagee.h"
 
-
-// TODO: implementez ici les fonctions decrites dans commMemoirePartagee.h
-
-
-/* pour référence
-    struct memPartage{
-        int fd;                         // Descripteur de fichier retourné par shm_open
-        struct memPartageHeader *header;// Pointeur vers le header dans la mémoire partagée
-        size_t tailleDonnees;           // Taille de la zone de données (après le header)
-        unsigned char* data;            // Pointeur vers la zone de données (après le header)
-};
-*/
-
 // Appelée au début du programme pour l'initialisation de la zone mémoire (cas du lecteur).
 // Reçoit un pointeur vers une structure memPartage _vide_.
 // Cette fonction doit _remplir_ cette structure avec les informations nécessaires
