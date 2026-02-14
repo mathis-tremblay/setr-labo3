@@ -21,12 +21,12 @@
 #define HEADER_SIZE 4
 const char header[] = "SETR";
 
-struct videoInfos{
+/*struct videoInfos{
         uint32_t largeur;
         uint32_t hauteur;
         uint32_t canaux;
         uint32_t fps;
-};
+};*/
 
 /******************************************************************************
 * FORMAT DU FICHIER VIDEO

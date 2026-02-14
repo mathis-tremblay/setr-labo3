@@ -43,7 +43,8 @@ extern "C" {
 // à créer pour lire et écrire l'espace mémoire partagé.
 
 // Structure contenant les informations sur la vidéo
-struct videoInfos{
+struct 
+videoInfos{
     uint32_t largeur;       // en pixels
     uint32_t hauteur;
     uint32_t canaux;        // Nombre de canaux (1 = niveaux de gris, 3 = BGR)
