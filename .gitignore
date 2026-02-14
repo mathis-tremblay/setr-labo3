@@ -1,0 +1,11 @@
+build/
+# Fichiers compilés
+*.o
+*.out
+*.elf
+*.bin
+*.hex
+# Fichiers temporaires
+*.log
+*.tmp
+*.swp
