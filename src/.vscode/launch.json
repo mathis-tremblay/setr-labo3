@@ -1,0 +1,84 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Decodeur",
+            "type": "gdb",
+            "request": "attach",
+            "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
+            "executable": "./build/decodeur",
+            "target": "setr-mathis.duckdns.org:4560",
+            "remote": true,
+            "autorun": [
+                "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "syncAndStartGDBdecodeur"
+        },
+
+        {
+            "name": "Compositeur",
+            "type": "gdb",
+            "request": "attach",
+            "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
+            "executable": "./build/compositeur",
+            "target": "setr-mathis.duckdns.org:4561",
+            "remote": true,
+            "autorun": [
+                "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "syncAndStartGDBcompositeur"
+        },
+
+        {
+            "name": "Filtreur",
+            "type": "gdb",
+            "request": "attach",
+            "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
+            "executable": "./build/filtreur",
+            "target": "setr-mathis.duckdns.org:4562",
+            "remote": true,
+            "autorun": [
+                "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "syncAndStartGDBfiltreur"
+        },
+        
+        {
+            "name": "Redimensionneur",
+            "type": "gdb",
+            "request": "attach",
+            "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
+            "executable": "./build/redimensionneur",
+            "target": "setr-mathis.duckdns.org:4563",
+            "remote": true,
+            "autorun": [
+                "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "syncAndStartGDBredimensionneur"
+        },
+        
+        {
+            "name": "Convertisseur",
+            "type": "gdb",
+            "request": "attach",
+            "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
+            "executable": "./build/convertisseur",
+            "target": "setr-mathis.duckdns.org:4564",
+            "remote": true,
+            "autorun": [
+                "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
+            ],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "syncAndStartGDBconvertisseur"
+        }
+
+    ]
+}
