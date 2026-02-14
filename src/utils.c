@@ -10,6 +10,7 @@
 // permettant, entre autres, l'accès à sched_setattr
 #define _GNU_SOURCE
 #include "utils.h"
+#include <linux/sched.h>
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -17,7 +18,44 @@
 
 // Applique les paramètres d'ordonnancement au processus courant
 int appliquerOrdonnancement(const struct SchedParams* params, const char* nomProgramme) {
-    // TODO : implémenter cette fonction
+    if (params == NULL) {
+        return -1;
+    }
+
+    // On fait rien si NORT (deja l'ordonnacement de base)
+    if (params->modeOrdonnanceur == ORDONNANCEMENT_NORT) {
+        return 0;
+    }
+
+    struct sched_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.size = sizeof(attr);
+
+    switch (params->modeOrdonnanceur) {
+        case ORDONNANCEMENT_RR:
+            attr.sched_policy = SCHED_RR;
+            attr.sched_priority = 99;
+            break;
+        case ORDONNANCEMENT_FIFO:
+            attr.sched_policy = SCHED_FIFO;
+            attr.sched_priority = 99;
+            break;
+        case ORDONNANCEMENT_DEADLINE:
+            attr.sched_policy = SCHED_DEADLINE;
+            attr.sched_runtime = (uint64_t)params->runtime * 1000000ULL; // converti de ms à ns
+            attr.sched_deadline = (uint64_t)params->deadline * 1000000ULL;
+            attr.sched_period = (uint64_t)params->period * 1000000ULL;
+            break;
+        default:
+            return -1;
+    }
+
+    if (sched_setattr(0, &attr, 0) != 0) {
+        fprintf(stderr, "%s: erreur sched_setattr: %s\n", nomProgramme, strerror(errno));
+        return -1;
+    }
+
+    return 0;
 }
 
 // Parse l'option -s (type d'ordonnanceur: NORT, RR, FIFO, DEADLINE)
