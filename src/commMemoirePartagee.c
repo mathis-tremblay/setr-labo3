@@ -188,7 +188,10 @@ int initMemoirePartageeEcrivain(const char* identifiant,
 // immédiatement si des données sont déjà disponibles, soit bloquer et mettre le processus en pause 
 // (en attendant sur la condition POSIX) jusqu’à ce que ce soit le cas.
 int attenteLecteur(struct memPartage *zone){
-    // TODO
+    pthread_mutex_lock(&zone->header->mutex);
+    while(zone->header->etat != ETAT_PRET_AVEC_DONNEES){
+        pthread_cond_wait(&zone->header->condLecteur, &zone->header->mutex);
+    }
     return 0;
 }
 
@@ -198,24 +201,40 @@ int attenteLecteur(struct memPartage *zone){
 // est prête ou non à être lue.
 // Lorsque cette fonction retourne une valeur indiquant que la lecture est possible, le mutex devrait être 
 // verrouillé par le processus en cours!
+// return 0 si prêt, -1 sinon
 int attenteLecteurAsync(struct memPartage *zone){
-    // TODO
-    return 0;
+    if(pthread_mutex_trylock(&zone->header->mutex) != 0){ // trylock pour ne pas bloquer si le mutex est déjà verrouillé
+        return -1; // Mutex déjà verrouillé, pas disponible
+    }
+    if(zone->header->etat != ETAT_PRET_AVEC_DONNEES){
+        pthread_mutex_unlock(&zone->header->mutex);
+        return -1; // Pas prêt
+    }
+    return 0; // Prêt et mutex verrouillé
 }
 
 // Appelée par l'écrivain pour se mettre en attente de la lecture du résultat précédent par un lecteur
 // Lorsque cette fonction retourne, le mutex devrait être verrouillé par le processus en cours!
 int attenteEcrivain(struct memPartage *zone){
-    // TODO
+    pthread_mutex_lock(&zone->header->mutex);
+    while(zone->header->etat == ETAT_PRET_AVEC_DONNEES){
+        pthread_cond_wait(&zone->header->condEcrivain, &zone->header->mutex);
+    }
     return 0;
 }
 
 // Appelée par le lecteur pour signaler qu'il a fini de lire (réveille l'écrivain correspondant)
+// IMPORTANT: Cette fonction assume que le mutex est déjà verrouillé par l'appelant
 void signalLecteur(struct memPartage *zone){
-    // TODO
+    zone->header->etat = ETAT_PRET_SANS_DONNEES;
+    pthread_cond_signal(&zone->header->condEcrivain);
+    pthread_mutex_unlock(&zone->header->mutex);
 }
 
 // Appelée par l'écrivain pour signaler qu'il a fini d'écrire (réveille le lecteur correspondant)
+// IMPORTANT: Cette fonction assume que le mutex est déjà verrouillé par l'appelant
 void signalEcrivain(struct memPartage *zone){
-    // TODO
+    zone->header->etat = ETAT_PRET_AVEC_DONNEES;
+    pthread_cond_signal(&zone->header->condLecteur);
+    pthread_mutex_unlock(&zone->header->mutex);
 }
