@@ -81,9 +81,10 @@ int initMemoirePartageeLecteur(const char* identifiant,
 int initMemoirePartageeEcrivain(const char* identifiant,
                                 struct memPartage *zone,
                                 struct videoInfos *infos)
-{
+{   
+    
     // 1. Créer et ouvrir le fichier virtuel de mémoire partagée en utilisant shm_open
-    int fd = shm_open(identifiant, O_CREAT, 0666);
+    int fd = shm_open(identifiant, O_CREAT | O_RDWR, 0666);
     if (fd == -1) {
         perror("shm_open");
         return -1;

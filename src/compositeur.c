@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <getopt.h>
 
 #include <sys/ioctl.h>
 

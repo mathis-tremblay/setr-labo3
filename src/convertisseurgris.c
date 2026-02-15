@@ -9,6 +9,7 @@
 
 // Gestion des ressources et permissions
 #include <sys/resource.h>
+#include <getopt.h>
 
 
 #include "allocateurMemoire.h"
