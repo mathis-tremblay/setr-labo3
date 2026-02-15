@@ -18,7 +18,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <stdint.h>
-
+#include <signal.h>
 #include "allocateurMemoire.h"
 #include "commMemoirePartagee.h"
 #include "utils.h"
@@ -28,6 +28,16 @@
 // Définition de diverses structures pouvant vous être utiles pour la lecture d'un fichier ULV
 #define HEADER_SIZE 4
 const char header[] = "SETR";
+
+// Variable globale pour cleanup propre
+volatile sig_atomic_t running = 1;
+struct memPartage* global_zoneSortie = NULL;
+char* global_sortie = NULL;
+
+void signal_handler(int signum) {
+    running = 0;
+}
+
 
 /*struct videoInfos{
         uint32_t largeur;
@@ -80,7 +90,7 @@ int main(int argc, char* argv[]){
     if(strcmp(argv[1], "--debug") == 0){
         // Mode debug, vous pouvez changer ces valeurs pour ce qui convient dans vos tests
         printf("Mode debug selectionne pour le decodeur\n");
-        entree = (char*)"video1.ulv";
+        entree = (char*)"./160p/03_BigBuckBunny.ulv";
         sortie = (char*)"/mem1";
     }
     else{
@@ -110,6 +120,10 @@ int main(int argc, char* argv[]){
     }
 
     printf("Initialisation decodeur, entree=%s, sortie=%s, mode d'ordonnancement=%i\n", entree, sortie, schedParams.modeOrdonnanceur);
+    
+    // Installer le signal handler pour cleanup propre
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
     
     // Changement de mode d'ordonnancement
     appliquerOrdonnancement(&schedParams, "decodeur");
@@ -169,6 +183,10 @@ int main(int argc, char* argv[]){
         close(fd);
         return -1;
     }
+    
+    // Stocker pour cleanup
+    global_zoneSortie = &zoneSortie;
+    global_sortie = sortie;
 
     // Préparer l'allocateur mémoire temps réel (décodeur: pas d'entrée, seulement la taille de sortie)
     size_t tailleImage = (size_t)infos.largeur * (size_t)infos.hauteur * (size_t)infos.canaux;
@@ -179,11 +197,8 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
-    // Cadence cible en microsecondes (si fps valide)
-    uint32_t delaiUsec = (infos.fps > 0) ? (1000000U / infos.fps) : 0U;
-
     // Lire et décoder les images en boucle
-    while (1) {
+    while (running) {
         if (cursor + sizeof(uint32_t) > fileMap + st.st_size) {
             fprintf(stderr, "Fichier d'entree non conforme (taille insuffisante pour lire la taille de l'image)\n");
             break;
@@ -231,15 +246,14 @@ int main(int argc, char* argv[]){
         signalEcrivain(&zoneSortie);
 
         tempsreel_free(decodedImage);
-
-        // Libérer le processeur pour respecter la cadence cible
-        if (delaiUsec > 0) {
-            evenementProfilage(&profInfos, ETAT_ENPAUSE);
-            usleep(delaiUsec);
-        }
     }
+    // Cleanup propre
+    printf("\nArret du decodeur, nettoyage en cours...\n");
+    munmap(fileMap, st.st_size);
+    close(fd);
     munmap(zoneSortie.header, sizeof(struct memPartageHeader) + zoneSortie.tailleDonnees);
     close(zoneSortie.fd);
-    shm_unlink(sortie);  // Supprime /dev/shm/mem1
+    shm_unlink(sortie);
+    printf("Nettoyage termine.\n");
     return 0;
 }

@@ -18,6 +18,8 @@ static void* poolPetits = NULL; // Pool pour les petits blocs (autres allocation
 static size_t tailleGrosBloc = 0;
 static int grosBlocsLibres[ALLOC_N_GROS_BLOCS] = {0}; // 0 = libre, 1 = utilisé
 static int petitsBlocsLibres[ALLOC_N_PETITS_BLOCS] = {0};
+static int dernierGrosLibre = 0;  // Index du dernier bloc gros libéré
+static int dernierPetitLibre = 0; // Index du dernier bloc petit libéré
 
 // Prépare les buffers nécessaires pour une allocation correspondante aux tailles
 // d'images passées en paramètre. Retourne 0 en cas de succès, et -1 si un
@@ -86,18 +88,22 @@ int prepareMemoire(size_t tailleImageEntree, size_t tailleImageSortie){
 // Trouve un bloc libre dans le pool spécifié et le marque comme utilisé. Retourne un pointeur vers ce bloc, ou NULL si aucun bloc n'est disponible.
 void* tempsreel_malloc(size_t taille){
     if (taille > ALLOC_TAILLE_PETIT) {
-        // Allocation dans le pool des gros blocs
-        for (int i = 0; i < ALLOC_N_GROS_BLOCS; i++) {
+        // Allocation dans le pool des gros blocs - recherche circulaire depuis dernierGrosLibre
+        for (int count = 0; count < ALLOC_N_GROS_BLOCS; count++) {
+            int i = (dernierGrosLibre + count) % ALLOC_N_GROS_BLOCS;
             if (grosBlocsLibres[i] == 0) {
-                grosBlocsLibres[i] = 1; // Marquer comme utilisé
+                grosBlocsLibres[i] = 1;
+                dernierGrosLibre = (i + 1) % ALLOC_N_GROS_BLOCS;
                 return (char*)poolGros + i * tailleGrosBloc;
             }
         }
     } else {
-        // Allocation dans le pool des petits blocs
-        for (int i = 0; i < ALLOC_N_PETITS_BLOCS; i++) {
+        // Allocation dans le pool des petits blocs - recherche circulaire depuis dernierPetitLibre
+        for (int count = 0; count < ALLOC_N_PETITS_BLOCS; count++) {
+            int i = (dernierPetitLibre + count) % ALLOC_N_PETITS_BLOCS;
             if (petitsBlocsLibres[i] == 0) {
-                petitsBlocsLibres[i] = 1; // Marquer comme utilisé
+                petitsBlocsLibres[i] = 1;
+                dernierPetitLibre = (i + 1) % ALLOC_N_PETITS_BLOCS;
                 return (char*)poolPetits + i * ALLOC_TAILLE_PETIT;
             }
         }
@@ -107,18 +113,22 @@ void* tempsreel_malloc(size_t taille){
 
 // Marque le bloc comme libre en fonction de son adresse. Ne fait rien si le pointeur ne correspond à aucun bloc alloué.
 void tempsreel_free(void* ptr){
+    if (ptr == NULL) return;
+    
     // verifie si adresse correspond au pool des gros blocs
-    if (ptr >= poolGros && ptr < (char*)poolGros + ALLOC_N_GROS_BLOCS * tailleGrosBloc /*max*/) { // note : (char*) cast le ptr pour faire des calculs d'adresses en octets
+    if (ptr >= poolGros && ptr < (char*)poolGros + ALLOC_N_GROS_BLOCS * tailleGrosBloc) {
         // Libération d'un bloc du pool des gros blocs
         int index = ((char*)ptr - (char*)poolGros) / tailleGrosBloc;
         if (index >= 0 && index < ALLOC_N_GROS_BLOCS) {
-            grosBlocsLibres[index] = 0; // Marquer comme libre
+            grosBlocsLibres[index] = 0;
+            dernierGrosLibre = index;  // Optimisation: prochain malloc cherchera ici
         }
-    } else if (ptr >= poolPetits && ptr < (char*)poolPetits + ALLOC_N_PETITS_BLOCS * ALLOC_TAILLE_PETIT /*max*/) {
+    } else if (ptr >= poolPetits && ptr < (char*)poolPetits + ALLOC_N_PETITS_BLOCS * ALLOC_TAILLE_PETIT) {
         // Libération d'un bloc du pool des petits blocs
         int index = ((char*)ptr - (char*)poolPetits) / ALLOC_TAILLE_PETIT;
         if (index >= 0 && index < ALLOC_N_PETITS_BLOCS) {
-            petitsBlocsLibres[index] = 0; // Marquer comme libre
+            petitsBlocsLibres[index] = 0;
+            dernierPetitLibre = index;  // Optimisation: prochain malloc cherchera ici
         }
     }
 }
