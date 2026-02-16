@@ -22,7 +22,7 @@ int initMemoirePartageeLecteur(const char* identifiant,
     // Réessayer si ENOENT (fichier inexistant)
     int fd = -1;
     while (fd == -1) {
-        fd = shm_open(identifiant, O_RDONLY, 0666);
+        fd = shm_open(identifiant, O_RDWR, 0666);
         if (fd == -1 && errno == ENOENT) {
             usleep(DELAI_INIT_READER_USEC);
         } else if (fd == -1) {
@@ -48,7 +48,7 @@ int initMemoirePartageeLecteur(const char* identifiant,
     }
     
     // Étape 3: Utiliser mmap pour accéder au fichier
-    void *addr = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    void *addr = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (addr == MAP_FAILED) {
         perror("mmap");
         close(fd);

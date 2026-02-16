@@ -7,6 +7,7 @@
  * Fichier implémentant le programme de décodage des fichiers ULV
  ******************************************************************************/
 
+#define _POSIX_C_SOURCE 200809L
 
 // Gestion des ressources et permissions
 #include <sys/resource.h>
@@ -18,7 +19,6 @@
 #include <getopt.h>
 #include <string.h>
 #include <stdint.h>
-#include <signal.h>
 #include "allocateurMemoire.h"
 #include "commMemoirePartagee.h"
 #include "utils.h"
@@ -28,16 +28,6 @@
 // Définition de diverses structures pouvant vous être utiles pour la lecture d'un fichier ULV
 #define HEADER_SIZE 4
 const char header[] = "SETR";
-
-// Variable globale pour cleanup propre
-volatile sig_atomic_t running = 1;
-struct memPartage* global_zoneSortie = NULL;
-char* global_sortie = NULL;
-
-void signal_handler(int signum) {
-    running = 0;
-}
-
 
 /*struct videoInfos{
         uint32_t largeur;
@@ -121,10 +111,6 @@ int main(int argc, char* argv[]){
 
     printf("Initialisation decodeur, entree=%s, sortie=%s, mode d'ordonnancement=%i\n", entree, sortie, schedParams.modeOrdonnanceur);
     
-    // Installer le signal handler pour cleanup propre
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    
     // Changement de mode d'ordonnancement
     appliquerOrdonnancement(&schedParams, "decodeur");
     
@@ -175,6 +161,13 @@ int main(int argc, char* argv[]){
     memcpy(&infos.fps, cursor, sizeof(uint32_t));
     cursor += sizeof(uint32_t);
 
+    // Supprimer une ancienne zone mémoire partagée de sortie si elle existe déjà
+    if (shm_unlink(sortie) == 0) {
+        printf("Ancienne zone memoire partagee supprimee: %s\n", sortie);
+    } else if (errno != ENOENT) {
+        fprintf(stderr, "Avertissement: impossible de supprimer %s avant recreation: %s\n", sortie, strerror(errno));
+    }
+
     // Initialiser la zone mémoire partagée de sortie
     struct memPartage zoneSortie;
     if (initMemoirePartageeEcrivain(sortie, &zoneSortie, &infos) != 0) {
@@ -184,10 +177,6 @@ int main(int argc, char* argv[]){
         return -1;
     }
     
-    // Stocker pour cleanup
-    global_zoneSortie = &zoneSortie;
-    global_sortie = sortie;
-
     // Préparer l'allocateur mémoire temps réel (décodeur: pas d'entrée, seulement la taille de sortie)
     size_t tailleImage = (size_t)infos.largeur * (size_t)infos.hauteur * (size_t)infos.canaux;
     if (prepareMemoire(tailleImage, tailleImage) != 0) {
@@ -198,7 +187,7 @@ int main(int argc, char* argv[]){
     }
 
     // Lire et décoder les images en boucle
-    while (running) {
+    while (1) {
         if (cursor + sizeof(uint32_t) > fileMap + st.st_size) {
             fprintf(stderr, "Fichier d'entree non conforme (taille insuffisante pour lire la taille de l'image)\n");
             break;

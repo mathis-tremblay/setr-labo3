@@ -182,10 +182,6 @@ void ecrireImage(const int position, const int total,
 
 int main(int argc, char* argv[])
 {
-    // TODO TODO TODO
-    // ÉCRIVEZ ICI votre code d'analyse des arguments du programme et d'initialisation des zones mémoire partagées
-    int nbrActifs;      // Après votre initialisation, cette variable DOIT contenir le nombre de flux vidéos actifs (de 1 à 4 inclusivement).
-    
     // On desactive le buffering pour les printf(), pour qu'il soit possible de les voir depuis votre ordinateur
     setbuf(stdout, NULL);
     
@@ -198,6 +194,97 @@ int main(int argc, char* argv[])
     
     // Premier evenement de profilage : l'initialisation du programme
     evenementProfilage(&profInfos, ETAT_INITIALISATION);
+
+    // Code lisant les options sur la ligne de commande
+    char *flux[4] = {NULL, NULL, NULL, NULL};
+    struct SchedParams schedParams = {0, 0, 0, 0};
+    int nbrActifs = 0;
+
+    if(argc < 2){
+        printf("Nombre d'arguments insuffisant\n");
+        return -1;
+    }
+
+    if(strcmp(argv[1], "--debug") == 0){
+        printf("Mode debug selectionne pour le compositeur\n");
+        flux[0] = (char*)"/mem1";
+        nbrActifs = 1;
+    }
+    else{
+        int c;
+        opterr = 0;
+
+        while ((c = getopt (argc, argv, "s:d:")) != -1){
+            switch (c) {
+                case 's':
+                    parseSchedOption(optarg, &schedParams);
+                    break;
+                case 'd':
+                    parseDeadlineParams(optarg, &schedParams);
+                    break;
+                default:
+                    continue;
+            }
+        }
+
+        // Les flux d'entrée (de 1 à 4)
+        for(int i = optind; i < argc && nbrActifs < 4; i++){
+            flux[nbrActifs++] = argv[i];
+        }
+
+        if(nbrActifs == 0){
+            printf("Au moins un flux d'entree doit etre specifie\n");
+            return -1;
+        }
+    }
+
+    for(int i = 0; i < nbrActifs; i++){
+        printf("\tEntree %d : %s\n", i+1, flux[i]);
+    }
+    printf("Mode d'operation du scheduler modifie avec succes pour compositeur (%d).\n", schedParams.modeOrdonnanceur);
+    
+    // Changement de mode d'ordonnancement
+    appliquerOrdonnancement(&schedParams, "compositeur");
+
+    // Initialiser les zones mémoire partagées en lecteur
+    struct memPartage zones[4];
+    for(int i = 0; i < nbrActifs; i++){
+        if(initMemoirePartageeLecteur(flux[i], &zones[i]) != 0){
+            fprintf(stderr, "Erreur d'initialisation de la memoire partagee pour le flux %d\n", i+1);
+            return -1;
+        }
+    }
+
+    // Préparer l'allocateur mémoire (taille max d'une image 427x240x3)
+    size_t tailleImage = 427 * 240 * 3;
+    if(prepareMemoire(tailleImage, tailleImage) != 0){
+        fprintf(stderr, "Erreur d'initialisation de l'allocateur memoire temps reel\n");
+        return -1;
+    }
+
+    // Cadence cible (fps du premier flux)
+    uint32_t fpsCible = zones[0].header->infos.fps;
+    uint32_t delaiUsec = (fpsCible > 0) ? (1000000U / fpsCible) : 33333U;
+
+    // Ouvrir (créer) le fichier de stats
+    FILE *fstats = fopen("stats.txt", "w");
+    if(fstats == NULL){
+        // Essayer dans /tmp si le répertoire courant n'est pas accessible
+        fstats = fopen("/tmp/stats.txt", "w");
+        if(fstats == NULL){
+            perror("Erreur ouverture stats.txt");
+            return -1;
+        }
+        printf("Fichier stats cree dans /tmp/stats.txt\n");
+    }
+    setbuf(fstats, NULL);
+
+    // Variables pour le calcul des stats
+    double tempsDebut = get_time();
+    double derniereStats = tempsDebut;
+    double derniereImage[4] = {tempsDebut, tempsDebut, tempsDebut, tempsDebut};
+    int compteurImages[4] = {0, 0, 0, 0};
+    double delaiMax[4] = {0.0, 0.0, 0.0, 0.0};
 
     // Initialisation des structures nécessaires à l'affichage
     long int screensize = 0;
@@ -261,40 +348,68 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-
     while(1){
-            // Boucle principale du programme
-            // TODO
-            // Appelez ici ecrireImage() avec les images provenant des différents flux vidéo
-            // Attention à ne pas mélanger les flux, et à ne pas bloquer sur un mutex ou une
-            // condition (ce qui bloquerait l'interface entière). attenteLecteurAsync() pourra
-            // vous être très utile ici!
-            //
-            // Nous vous conseillons d'implémenter une limitation du nombre de FPS (images par
-            // seconde), nombre qui est spécifié pour chaque flux. Il est inutile d'aller plus
-            // vite que le nombre de FPS demandé, et cela consomme plus de ressources, ce qui
-            // peut rendre plus difficile l'exécution des configurations difficiles.
-        
-            // N'oubliez pas que toutes les images fournies à ecrireImage() DOIVENT être en
-            // 427x240 (voir le commentaire en haut du document).
-        
-            // Exemple d'appel à ecrireImage (n'oubliez pas de remplacer les arguments commençant par A_REMPLIR!)
-            /*ecrireImage(A_REMPLIR_POSITION_ACTUELLE, 
-                        nbrActifs, 
-                        fbfd, 
-                        fbp, 
-                        vinfo.xres, 
-                        vinfo.yres, 
-                        &vinfo, 
-                        finfo.line_length,
-                        A_REMPLIR_DONNEES_DE_LA_TRAME,
-                        A_REMPLIR_HAUTEUR_DE_LA_TRAME,
-                        A_REMPLIR_LARGEUR_DE_LA_TRAME,
-                        A_REMPLIR_NOMBRECANAUX_DANS_LA_TRAME);*/
+        // Pour chaque flux, vérifier si une image est prête (sans bloquer)
+        for(int i = 0; i < nbrActifs; i++){
+            evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXLECTURE);
+            int pret = attenteLecteurAsync(&zones[i]);
+            if(pret == 0){  // Image prête
+                evenementProfilage(&profInfos, ETAT_TRAITEMENT);
+                double maintenant = get_time();
+                
+                // Calculer le délai depuis la dernière image
+                double delai = (maintenant - derniereImage[i]) * 1000.0;  // en ms
+                if(delai > delaiMax[i]){
+                    delaiMax[i] = delai;
+                }
+                derniereImage[i] = maintenant;
+                compteurImages[i]++;
+                
+                // Afficher l'image
+                ecrireImage(i, 
+                            nbrActifs, 
+                            fbfd, 
+                            fbp, 
+                            vinfo.xres, 
+                            vinfo.yres, 
+                            &vinfo, 
+                            finfo.line_length,
+                            zones[i].data,
+                            zones[i].header->infos.hauteur,
+                            zones[i].header->infos.largeur,
+                            zones[i].header->infos.canaux);
+                signalLecteur(&zones[i]);
+            }
+        }
+
+        // Écrire les stats toutes les 5 secondes
+        double maintenant = get_time();
+        if(maintenant - derniereStats >= 5.0){
+            double tempsEcoule = maintenant - tempsDebut;
+            double periode = maintenant - derniereStats;
+            
+            fprintf(fstats, "[%.1f] ", tempsEcoule);
+            for(int i = 0; i < nbrActifs; i++){
+                double moyFps = (double)compteurImages[i] / periode;
+                fprintf(fstats, "Entree %d: moy=%.1f fps, max=%.1f ms | ", 
+                        i+1, moyFps, delaiMax[i]);
+                compteurImages[i] = 0;
+                delaiMax[i] = 0.0;
+            }
+            fprintf(fstats, "\n");
+            
+            derniereStats = maintenant;
+        }
+
+        // Respecter la cadence FPS
+        evenementProfilage(&profInfos, ETAT_ENPAUSE);
+        usleep(delaiUsec);
     }
 
 
     // cleanup
+    fclose(fstats);
+    
     // Retirer le mmap
     munmap(fbp, screensize);
 
