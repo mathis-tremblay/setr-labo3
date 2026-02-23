@@ -349,6 +349,8 @@ int main(int argc, char* argv[])
     }
 
     while(1){
+        double debutBoucle = get_time();
+        double delaiTraitement = 0;
         // Pour chaque flux, vérifier si une image est prête (sans bloquer)
         for(int i = 0; i < nbrActifs; i++){
             evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXLECTURE);
@@ -401,9 +403,17 @@ int main(int argc, char* argv[])
             derniereStats = maintenant;
         }
 
-        // Respecter la cadence FPS
+        // Respecter la cadence FPS en tenant compte du temps de traitement
+        double finBoucle = get_time();
+        delaiTraitement = (finBoucle - debutBoucle) * 1000000.0; // en µs
+
+        long tempsRestant = (long)delaiUsec - (long)delaiTraitement;
+
         evenementProfilage(&profInfos, ETAT_ENPAUSE);
-        usleep(delaiUsec);
+
+        if(tempsRestant > 0){
+            usleep(tempsRestant);
+        }
     }
 
 
