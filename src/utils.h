@@ -59,7 +59,6 @@ int parseDeadlineParams(char* arg, struct SchedParams* params);
 // Applique les paramètres d'ordonnancement au processus courant
 // La chaîne de caractères nomProgramme est utilisée pour les messages d'erreur
 // Retourne 0 en cas de succès, -1 en cas d'erreur
-// TODO : implémenter cette fonction dans utils.c
 int appliquerOrdonnancement(const struct SchedParams* params, const char* nomProgramme);
 
 #define ETAT_INDEFINI 0
