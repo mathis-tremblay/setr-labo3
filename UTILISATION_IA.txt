@@ -1,9 +1,28 @@
 Question 1 : Avez-vous utilisé un ou des outils d'IA pour ce laboratoire, même seulement en partie (oui/non)?
 
-Répondez aux questions suivantes seulement si vous avez répondu "oui" à la question précédente.
+Oui
 
+Répondez aux questions suivantes seulement si vous avez répondu "oui" à la question précédente
 Question 2 : Quels modèles (ex., Claude Opus, Gemini Pro, GPT-Codex, etc.)?
+
+ChatGPT 5.2 et Github Copilot
 
 Question 3 : Pour la réalisation de quelles tâches en particulier? Donnez un exemple de "prompt" utilisé et de résultat.
 
-Question 4 : Avez-vous rencontré des problèmes lors de l'utilisation de l'IA (mauvaise compréhension des commandes fournies, résultats erronés, etc.)? Qu'avez-vous fait pour les régler?
+Aide à la compréhension générale de la structure du projet (partie d'énoncer et code présent dans le repo).
+Aide au debug (enlever warn)
+Aide partiel à l'écriture des différents fichiers.
+Aide à l'écriture de commande Linux
+
+Exemple de prompt :
+Bonjour, je souhaite implémenter dans un projet, différentes fonctionnalités. Pour l'instant, j'aimerais juste que tu écoutes la mise en contexte que je vais t'envoyer. Je te dirais explicitement quoi coder quand ça sera le moment.
+[Copy/Paste de 2. Présentation du projet]
+La figure suivante représente l'architecture globale du projet, regarde-la et résume-moi ce que tu as compris.
+[Figure de l'architecture] 
+
+Question 4 : Avez-vous rencontré des problèmes lors de l'utilisation de l'IA (mauvaise compréhension des commandes fournies, résultats erronés, etc.)? Qu'avez-vous fait pour les régler
+
+Oui, ChatGPT n'avait pas la structure du projet, et malgré un contexte étendu que je lui est donné, il pouvait donner en particulier des commandes Linux et des path erronés.
+Le problème aurait pu être bien pire, mais j'ai utilisé la méthode de prompt qu'on m'a montré à mon stage (plan to implementation), c'est-à-dire : Expliquer le problème et lui demander ce qu'il comprend. Lui donner le contexte et lui demander ce qu'il comprend. Lui donner la tâche à effectuer sans lui demander d'ajouter du code et en lui demandant ensuite s’il a des interrogations sur l'implémentation. Répondre à ses interrogations. Et lorsque sa compréhension semble assez complète, lui demander d'écrire le code avec une justification systématique de chacun ses ajouts. Ensuite de manière optionnelle, on demande plus de précision sur ses choix.
+
+En utilisant cette méthode, quelques problèmes ont eu lieu. Entre autres, l'envoi des fichiers de configs sur le Rasberry Pi et l'efficacité du code proposé était variable. (Ce qui est à s'y attendre d'une gen IA).
