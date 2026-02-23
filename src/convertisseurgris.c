@@ -127,12 +127,11 @@ int main(int argc, char* argv[]){
         perror("mlockall (avertissement)");
     }
 
-    // Buffers de travail pour éviter de garder les mutex pendant le traitement
+    // Buffer de travail d'entrée pour éviter de garder le mutex de lecture pendant le traitement
     unsigned char *bufIn  = (unsigned char*)tempsreel_malloc(tailleIn);
-    unsigned char *bufOut = (unsigned char*)tempsreel_malloc(tailleOut);
-    if(bufIn == NULL || bufOut == NULL){
-        fprintf(stderr, "Erreur tempsreel_malloc pour buffers de travail (bufIn=%p, bufOut=%p)\n",
-                (void*)bufIn, (void*)bufOut);
+    if(bufIn == NULL){
+        fprintf(stderr, "Erreur tempsreel_malloc pour buffer de travail (bufIn=%p)\n",
+                (void*)bufIn);
         return -1;
     }
     
@@ -149,23 +148,22 @@ int main(int argc, char* argv[]){
         memcpy(bufIn, zoneEntree.data, tailleIn);
         signalLecteur(&zoneEntree);
 
-        // Traitement (hors mutex)
+        // Attendre que la sortie soit prête
+        evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXECRITURE);
+        attenteEcrivain(&zoneSortie);
+
+        // Traitement directement dans la zone de sortie (copie minimale)
         evenementProfilage(&profInfos, ETAT_TRAITEMENT);
         if(zoneEntree.header->infos.canaux == 1){
-            memcpy(bufOut, bufIn, tailleOut);
+            memcpy(zoneSortie.data, bufIn, tailleOut);
         } else {
             convertToGray(bufIn,
                           zoneEntree.header->infos.hauteur,
                           zoneEntree.header->infos.largeur,
                           zoneEntree.header->infos.canaux,
-                          bufOut);
+                          zoneSortie.data);
         }
 
-        // Attendre que la sortie soit prête, écrire, puis signaler le lecteur aval
-        evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXECRITURE);
-        attenteEcrivain(&zoneSortie);
-
-        memcpy(zoneSortie.data, bufOut, tailleOut);
         signalEcrivain(&zoneSortie);
     }
 

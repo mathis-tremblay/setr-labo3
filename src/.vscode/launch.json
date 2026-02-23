@@ -11,7 +11,7 @@
             "request": "attach",
             "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
             "executable": "./build/decodeur",
-            "target": "10.241.44.113:4560",//setr-mathis.duckdns.org
+            "target": "setr-mathis.duckdns.org:4560",
             "remote": true,
             "autorun": [
                 "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"
@@ -26,7 +26,7 @@
             "request": "attach",
             "gdbpath": "${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/bin/arm-raspbian-linux-gnueabi-gdb",
             "executable": "./build/compositeur",
-            "target": "10.241.44.113:4561",
+            "target": "setr-mathis.duckdns.org:4561",
             "remote": true,
             "autorun": [
                 "set sysroot ${env:HOME}/arm-cross-comp-env/arm-raspbian-linux-gnueabi/arm-raspbian-linux-gnueabi/sysroot/"

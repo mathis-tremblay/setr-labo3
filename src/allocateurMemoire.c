@@ -12,13 +12,15 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <stdio.h>
+#include <stddef.h>
 
 // Variables globales pour gérer les pools de mémoire
 static void*  poolGros = NULL;        // Pool pour les gros blocs (images)
 static void*  poolPetits = NULL;      // Pool pour les petits blocs (autres allocations)
 static size_t tailleGrosBloc = 0;
 
-static int grosBlocsLibres[ALLOC_N_GROS_BLOCS] = {0};      // 0 = libre, 1 = utilisé
+// États des gros blocs : 0 = libre, >0 = début d'allocation (nombre de blocs contigus), -1 = suite d'allocation
+static int grosBlocsLibres[ALLOC_N_GROS_BLOCS] = {0};
 static int petitsBlocsLibres[ALLOC_N_PETITS_BLOCS] = {0};
 
 static int dernierGrosLibre = 0;      // Index du dernier bloc gros libéré
@@ -95,21 +97,53 @@ int prepareMemoire(size_t tailleImageEntree, size_t tailleImageSortie)
 
 void* tempsreel_malloc(size_t taille)
 {
+    if (taille == 0) {
+        return NULL;
+    }
+
     if (taille > ALLOC_TAILLE_PETIT) {
 
-        for (int count = 0; count < ALLOC_N_GROS_BLOCS; count++) {
-            int i = (dernierGrosLibre + count) % ALLOC_N_GROS_BLOCS;
+        if (tailleGrosBloc == 0 || poolGros == NULL) {
+            return NULL;
+        }
 
-            if (grosBlocsLibres[i] == 0) {
-                grosBlocsLibres[i] = 1;
-                dernierGrosLibre = (i + 1) % ALLOC_N_GROS_BLOCS;
+        // Nombre de gros blocs nécessaires pour satisfaire la demande
+        size_t nBlocs = (taille + tailleGrosBloc - 1) / tailleGrosBloc;
+        if (nBlocs == 0 || nBlocs > ALLOC_N_GROS_BLOCS) {
+            return NULL;
+        }
+
+        for (int count = 0; count < ALLOC_N_GROS_BLOCS; count++) {
+            int debut = (dernierGrosLibre + count) % ALLOC_N_GROS_BLOCS;
+
+            // Vérifier si nBlocs contigus sont libres (avec bouclage circulaire)
+            int peutAllouer = 1;
+            for (size_t k = 0; k < nBlocs; ++k) {
+                int idx = (debut + (int)k) % ALLOC_N_GROS_BLOCS;
+                if (grosBlocsLibres[idx] != 0) {
+                    peutAllouer = 0;
+                    break;
+                }
+            }
+
+            if (peutAllouer) {
+                grosBlocsLibres[debut] = (int)nBlocs;
+                for (size_t k = 1; k < nBlocs; ++k) {
+                    int idx = (debut + (int)k) % ALLOC_N_GROS_BLOCS;
+                    grosBlocsLibres[idx] = -1;
+                }
+                dernierGrosLibre = (debut + (int)nBlocs) % ALLOC_N_GROS_BLOCS;
 
                 char* base = (char*)poolGros;
-                return base + (size_t)i * tailleGrosBloc;
+                return base + (size_t)debut * tailleGrosBloc;
             }
         }
     }
     else {
+
+        if (poolPetits == NULL) {
+            return NULL;
+        }
 
         for (int count = 0; count < ALLOC_N_PETITS_BLOCS; count++) {
             int i = (dernierPetitLibre + count) % ALLOC_N_PETITS_BLOCS;
@@ -135,6 +169,9 @@ void tempsreel_free(void* ptr)
     if (ptr == NULL)
         return;
 
+    if (poolGros == NULL || poolPetits == NULL)
+        return;
+
     char* p = (char*)ptr;
 
     char* debutGros  = (char*)poolGros;
@@ -146,11 +183,42 @@ void tempsreel_free(void* ptr)
     // Vérifie pool gros blocs
     if (p >= debutGros && p < finGros) {
 
+        if (tailleGrosBloc == 0)
+            return;
+
+        ptrdiff_t delta = p - debutGros;
+        if ((size_t)delta % tailleGrosBloc != 0)
+            return;
+
         int index = (int)((p - debutGros) / tailleGrosBloc);
 
         if (index >= 0 && index < ALLOC_N_GROS_BLOCS) {
-            grosBlocsLibres[index] = 0;
-            dernierGrosLibre = index;
+            int nBlocs = grosBlocsLibres[index];
+
+            // Si jamais on reçoit un pointeur sur un bloc de continuation,
+            // on retrouve le début de l'allocation.
+            if (nBlocs == -1) {
+                int j = index;
+                for (int steps = 0; steps < ALLOC_N_GROS_BLOCS; ++steps) {
+                    j = (j - 1 + ALLOC_N_GROS_BLOCS) % ALLOC_N_GROS_BLOCS;
+                    if (grosBlocsLibres[j] > 0) {
+                        index = j;
+                        nBlocs = grosBlocsLibres[j];
+                        break;
+                    }
+                    if (grosBlocsLibres[j] == 0) {
+                        return;
+                    }
+                }
+            }
+
+            if (nBlocs > 0) {
+                for (int k = 0; k < nBlocs; ++k) {
+                    int idx = (index + k) % ALLOC_N_GROS_BLOCS;
+                    grosBlocsLibres[idx] = 0;
+                }
+                dernierGrosLibre = index;
+            }
         }
     }
     // Vérifie pool petits blocs
