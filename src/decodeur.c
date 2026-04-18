@@ -186,6 +186,11 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
+    // Verrouiller les pages mémoire du processus (heap/pile + allocations futures)
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+        perror("mlockall (avertissement)");
+    }
+
     // Lire et décoder les images en boucle
     while (1) {
         if (cursor + sizeof(uint32_t) > fileMap + st.st_size) {

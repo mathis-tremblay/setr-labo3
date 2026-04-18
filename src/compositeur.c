@@ -262,6 +262,18 @@ int main(int argc, char* argv[])
         return -1;
     }
 
+    // Verrouiller les pages mémoire du processus (heap/pile + allocations futures)
+    if(mlockall(MCL_CURRENT | MCL_FUTURE) != 0){
+        perror("mlockall (avertissement)");
+    }
+
+    // Buffer local pour éviter de garder le mutex pendant l'affichage
+    unsigned char *bufferCourant = (unsigned char*)tempsreel_malloc(tailleImage);
+    if(bufferCourant == NULL){
+        fprintf(stderr, "Erreur tempsreel_malloc pour bufferCourant\n");
+        return -1;
+    }
+
     // Cadence cible (fps du premier flux)
     uint32_t fpsCible = zones[0].header->infos.fps;
     uint32_t delaiUsec = (fpsCible > 0) ? (1000000U / fpsCible) : 33333U;
@@ -356,6 +368,12 @@ int main(int argc, char* argv[])
             evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXLECTURE);
             int pret = attenteLecteurAsync(&zones[i]);
             if(pret == 0){  // Image prête
+                size_t tailleSource = (size_t)zones[i].header->infos.largeur *
+                                      (size_t)zones[i].header->infos.hauteur *
+                                      (size_t)zones[i].header->infos.canaux;
+                memcpy(bufferCourant, zones[i].data, tailleSource);
+                signalLecteur(&zones[i]);
+
                 evenementProfilage(&profInfos, ETAT_TRAITEMENT);
                 double maintenant = get_time();
                 
@@ -376,11 +394,10 @@ int main(int argc, char* argv[])
                             vinfo.yres, 
                             &vinfo, 
                             finfo.line_length,
-                            zones[i].data,
+                            bufferCourant,
                             zones[i].header->infos.hauteur,
                             zones[i].header->infos.largeur,
                             zones[i].header->infos.canaux);
-                signalLecteur(&zones[i]);
             }
         }
 
