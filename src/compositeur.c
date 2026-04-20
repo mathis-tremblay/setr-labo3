@@ -361,10 +361,13 @@ int main(int argc, char* argv[])
     }
 
     while(1){
+        static unsigned int cptIterations = 0;
         double debutBoucle = get_time();
         double delaiTraitement = 0;
         int imageTraitee = 0;
         // Pour chaque flux, vérifier si une image est prête (sans bloquer)
+        // Batching I/O: tester les flux seulement tous les 4 tours (réduire appels mutex trylock)
+        if(cptIterations % 4 == 0){
         for(int i = 0; i < nbrActifs; i++){
             evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXLECTURE);
             int pret = attenteLecteurAsync(&zones[i]);
@@ -402,10 +405,12 @@ int main(int argc, char* argv[])
                             zones[i].header->infos.canaux);
             }
         }
+        }
+        cptIterations++;
 
-        // Écrire les stats toutes les 5 secondes
+        // Batching I/O: écrire stats tous les 15s au lieu de 5s (réduire écritures fichier)
         double maintenant = get_time();
-        if(maintenant - derniereStats >= 5.0){
+        if(maintenant - derniereStats >= 15.0){
             double tempsEcoule = maintenant - tempsDebut;
             double periode = maintenant - derniereStats;
             
