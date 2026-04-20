@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <getopt.h>
+#include <time.h>
 #include <string.h>
 #include <stdint.h>
 #include "allocateurMemoire.h"
@@ -191,6 +192,12 @@ int main(int argc, char* argv[]){
         perror("mlockall (avertissement)");
     }
 
+    // Cadencer la production d'images pour éviter de tourner en boucle active
+    uint32_t fpsCible = (infos.fps > 0) ? infos.fps : 30;
+    int64_t periodeNs = 1000000000LL / (int64_t)fpsCible;
+    struct timespec prochainReveil;
+    clock_gettime(CLOCK_MONOTONIC, &prochainReveil);
+
     // Lire et décoder les images en boucle
     while (1) {
         if (cursor + sizeof(uint32_t) > fileMap + st.st_size) {
@@ -240,6 +247,14 @@ int main(int argc, char* argv[]){
         signalEcrivain(&zoneSortie);
 
         tempsreel_free(decodedImage);
+
+        // Sommeil jusqu'à la prochaine échéance (absolue) pour maximiser l'état idle
+        int64_t ns = (int64_t)prochainReveil.tv_nsec + periodeNs;
+        prochainReveil.tv_sec += (time_t)(ns / 1000000000LL);
+        prochainReveil.tv_nsec = (long)(ns % 1000000000LL);
+        while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &prochainReveil, NULL) == EINTR) {
+            // Reprendre l'attente si interrompue par un signal
+        }
     }
     // Cleanup propre
     printf("\nArret du decodeur, nettoyage en cours...\n");

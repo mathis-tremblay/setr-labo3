@@ -363,11 +363,13 @@ int main(int argc, char* argv[])
     while(1){
         double debutBoucle = get_time();
         double delaiTraitement = 0;
+        int imageTraitee = 0;
         // Pour chaque flux, vérifier si une image est prête (sans bloquer)
         for(int i = 0; i < nbrActifs; i++){
             evenementProfilage(&profInfos, ETAT_ATTENTE_MUTEXLECTURE);
             int pret = attenteLecteurAsync(&zones[i]);
             if(pret == 0){  // Image prête
+                imageTraitee = 1;
                 size_t tailleSource = (size_t)zones[i].header->infos.largeur *
                                       (size_t)zones[i].header->infos.hauteur *
                                       (size_t)zones[i].header->infos.canaux;
@@ -430,6 +432,10 @@ int main(int argc, char* argv[])
 
         if(tempsRestant > 0){
             usleep(tempsRestant);
+        }
+        else if(!imageTraitee){
+            // Aucun flux prêt et aucune pause de cadence possible: éviter le busy-spin
+            usleep(1000);
         }
     }
 
